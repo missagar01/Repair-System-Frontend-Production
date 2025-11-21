@@ -1,6 +1,9 @@
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
+
+
 export const authenticateUser = async (username, password) => {
   try {
-    const response = await fetch("http://localhost:5050/api/auth/login", {
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
