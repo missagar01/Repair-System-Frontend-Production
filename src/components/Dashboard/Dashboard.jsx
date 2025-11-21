@@ -53,95 +53,36 @@ const Dashboard = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1IUX8rnhuodWWPQ2PPAFurz-S1Xoz-9h5";
 
-  const fetchAllTasks = async () => {
-    try {
-      setLoading(true);
-      const SHEET_NAME_TASK = "Repair System";
+const fetchAllTasks = async () => {
+  try {
+    setLoading(true);
 
-      const res = await fetch(
-        `${SCRIPT_URL}?sheetId=${SHEET_Id}&&sheet=${SHEET_NAME_TASK}`
-      );
-      const result = await res.json();
+    const res = await fetch("http://localhost:5050/api/dashboard");
+    const result = await res.json();
 
-      const allRows = result?.table?.rows || [];
-      const taskRows = allRows.slice(5);
-
-      const formattedTasks = taskRows.map((row) => {
-        const cells = row.c;
-
-        return {
-          status: cells[46]?.v || "",
-          totalBillRepair: cells[35]?.v || "",
-          department: cells[13]?.v || "",
-          paymentType: cells[25]?.v || "",
-          vendorName: cells[19]?.v || "",
-        };
-      });
-
-      setTasks(formattedTasks);
-      const pendingTasks = formattedTasks.filter(
-        (task) => task.status === "Pending"
-      );
-      setPendingTasks(pendingTasks);
-
-      const compeletedTask = formattedTasks.filter(
-        (task) => task.status === "Completed"
-      );
-      setTotalCompletedTask(compeletedTask);
-
-      const totalRepairBill = formattedTasks.reduce((sum, item) => {
-        return sum + Number(item.totalBillRepair || 0);
-      }, 0);
-      setTotalRepairBill(totalRepairBill);
-
-      const departmentCounts = formattedTasks.reduce((acc, task) => {
-        const dept = task.department;
-        if (dept) {
-          acc[dept] = (acc[dept] || 0) + 1;
-        }
-        return acc;
-      }, {});
-
-      const repairStatusByDepartment = Object.entries(departmentCounts).map(
-        ([department, count]) => ({
-          department,
-          count,
-        })
-      );
-      setRepairStatusByDepartment(repairStatusByDepartment);
-
-      const paymentTypeTotals = formattedTasks.reduce((acc, task) => {
-        const type = task.paymentType === "undefined" ? "Unknown" : task.paymentType;
-        if (!acc[type]) {
-          acc[type] = 0;
-        }
-        acc[type] += task.totalBillRepair;
-        return acc;
-      }, {});
-
-      const paymentTypeDistribution = Object.entries(paymentTypeTotals).map(
-        ([type, amount]) => ({
-          type,
-          amount,
-        })
-      );
-      setPaymentTypeDistribution(paymentTypeDistribution);
-
-      const topRepairs = [...formattedTasks]
-        .sort((a, b) => b.totalBillRepair - a.totalBillRepair)
-        .slice(0, 5)
-        .map(task => ({
-          vendor: task.vendorName,
-          cost: task.totalBillRepair
-        }));
-      setVendorWiseRepairCosts(topRepairs);
-
-    } catch (err) {
-      console.error("Error fetching tasks:", err);
-    } finally {
-      setLoading(false);
+    if (!result.success) {
+      console.error("Dashboard API Error:", result.message);
+      return;
     }
-  };
+
+    const data = result.data;
+
+    // Assign to your states
+    setTasks(data.tasks || []);
+    setPendingTasks(data.pendingCount || 0);
+    setTotalCompletedTask(data.completedCount || 0);
+    setTotalRepairBill(data.totalRepairCost || 0);
+    setRepairStatusByDepartment(data.departmentStatus || []);
+    setPaymentTypeDistribution(data.paymentTypeDistribution || []);
+    setVendorWiseRepairCosts(data.vendorWiseCosts || []);
+
+  } catch (err) {
+    console.error("Error fetching dashboard data:", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchAllTasks();
@@ -301,7 +242,8 @@ const Dashboard = () => {
                       </span>
                     </div>
                     <span className="text-sm font-semibold text-gray-900">
-                      ₹{payment.amount.toLocaleString()}
+                      {/* ₹{payment.amount.toLocaleString()} */}
+                      ₹{Number(payment.amount || 0).toLocaleString()}
                     </span>
                   </div>
                 );
@@ -346,7 +288,8 @@ const Dashboard = () => {
                       />
                     </div>
                     <span className="text-sm font-semibold text-gray-900 w-16">
-                      ₹{vendor.cost.toLocaleString()}
+                      {/* ₹{vendor.cost.toLocaleString()} */}
+                      ₹{Number(vendor.cost || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>

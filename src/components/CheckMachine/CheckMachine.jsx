@@ -34,12 +34,12 @@ const CheckMachine = () => {
   const [loaderSubmit, setLoaderSubmit] = useState(false);
 
   const [formData, setFormData] = useState({
-    billImage: null,
-    billNo: "",
-    typeOfBill: "",
-    totalBillAmount: "",
-    paymentType: "",
-    toBePaidAmount: "",
+    bill_image: null,
+    bill_no: "",
+    type_of_bill: "",
+    total_bill_amount: "",
+    payment_type: "",
+    to_be_paid_amount: "",
     transporterName: "",
     transportationAmount: "",
   });
@@ -57,81 +57,39 @@ const CheckMachine = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
- const fetchAllTasks = async () => {
-    try {
-      setLoadingTasks(true);
-      const SHEET_NAME_TASK = "Repair System";
+  const API_BASE = "http://localhost:5050/api/repair-check";
 
-      const res = await fetch(
-        `${SCRIPT_URL}?sheetId=${SHEET_Id}&&sheet=${SHEET_NAME_TASK}`
-      );
-      const result = await res.json();
 
-      const allRows = result?.table?.rows || [];
-      const taskRows = allRows.slice(5);
+const fetchAllTasks = async () => {
+  try {
+    setLoadingTasks(true);
 
-      const formattedTasks = taskRows.map((row) => {
-        const cells = row.c;
+    const res = await fetch(`${API_BASE}/all`);
+    const result = await res.json();
 
-        return {
-          timestamp: cells[0]?.v || "",
-          taskNo: cells[1]?.v || "",
-          serialNo: cells[2]?.v || "",
-          machineName: cells[3]?.v || "",
-          machinePartName: cells[4]?.v || "",
-          givenBy: cells[5]?.v || "",
-          doerName: cells[6]?.v || "",
-          problem: cells[7]?.v || "",
-          enableReminder: cells[8]?.v || "",
-          requireAttachment: cells[9]?.v || "",
-          taskStartDate: cells[10]?.v || "",
-          taskEndDate: cells[11]?.v || "",
-          priority: cells[12]?.v || "",
-          department: cells[13]?.v || "",
-          location: cells[14]?.v || "",
-          imageUrl: cells[15]?.v || "",
-          planned: cells[16]?.v || "",
-          actual: cells[17]?.v || "",
-          delay: cells[18]?.v || "",
-          vendorName: cells[19]?.v || "",
-          leadTimeToDeliverDays: cells[20]?.v || "",
-          transporterName: cells[21]?.v || "",
-          transportationCharges: cells[22]?.v || "",
-          weighmentSlip: cells[23]?.v || "",
-          transportingImageWithMachine: cells[24]?.v || "",
-          paymentType: cells[25]?.v || "",
-          howMuch: cells[26]?.v || "",
-          planned1: cells[27]?.v || "",
-          actual1: cells[28]?.v || "",
-          tranporterName: cells[30]?.v || "",
-          billImage: cells[32]?.v || "",
-          billNo: cells[33]?.v || "",
-          typeOfBill: cells[34]?.v || "",
-          totalBillAmount: cells[35]?.v || "",
-          toBePaidAmount: cells[36]?.v || "",
-        };
-      });
-
-      setRepairTasks(formattedTasks);
-
-      // Set pending tasks - where AB (planned1) is not empty and AC (actual1) is empty
-      const pendingTasks = formattedTasks.filter(
-        (task) => task.planned1 && !task.actual1
-      );
-      setPendingRepairTasks(pendingTasks);
-
-      // Set history tasks - where both AB (planned1) and AC (actual1) are not empty
-      const historyTasks = formattedTasks.filter(
-        (task) => task.planned1 && task.actual1
-      );
-      setHistoryRepairTasks(historyTasks);
-    } catch (err) {
-      console.error("Error fetching tasks:", err);
+    if (!result.success) {
       toast.error("Failed to fetch tasks");
-    } finally {
-      setLoadingTasks(false);
+      return;
     }
-  };
+
+    const tasks = result.tasks || [];
+
+    setRepairTasks(tasks);
+
+    const pending = tasks.filter(t => t.planned_2 && !t.actual_2);
+    const history = tasks.filter(t => t.actual_2);
+
+    setPendingRepairTasks(pending);
+    setHistoryRepairTasks(history);
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Error fetching tasks");
+  } finally {
+    setLoadingTasks(false);
+  }
+};
+
 
   useEffect(() => {
     fetchAllTasks();
@@ -182,68 +140,74 @@ const CheckMachine = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    setLoaderSubmit(true);
 
-    try {
-      setLoaderSubmit(true);
-      let billImageUrl = "";
-      if (formData.billImage) {
-        billImageUrl = await uploadFileToDrive(formData.billImage);
-      }
+    // 1️⃣ Upload bill image to drive (same function you already have)
+    let bill_imageUrl = "";
+    if (formData.bill_image) {
+      bill_imageUrl = await uploadFileToDrive(formData.bill_image);
+    }
 
-      const payload = {
-        action: "update1",
-        sheetName: "Repair System",
-        taskNo: selectedTask.taskNo,
-        Actual1: new Date().toLocaleString("en-GB", {
-          timeZone: "Asia/Kolkata",
-        }),
-        "Transporter Name": formData.transporterName,
-        "Transportation Amount": formData.transportationAmount,
-        "Bill Image": billImageUrl,
-        "Bill No.": formData.billNo,
-        "Type of Bill": formData.typeOfBill,
-        "Total Bill Amount": formData.totalBillAmount,
-        "To Be Paid Amount": formData.toBePaidAmount,
-      };
+    // 2️⃣ Prepare payload
+    const payload = {
+  transporterName: formData.transporterName,
+  transportationAmount: formData.transportationAmount,
+  billImage: bill_imageUrl,
+  billNo: formData.bill_no,
+  typeOfBill: formData.type_of_bill,
+  totalBillAmount: Number(formData.total_bill_amount),
+  toBePaidAmount:
+    selectedTask?.how_much != null
+      ? Number(formData.total_bill_amount) - Number(selectedTask.how_much)
+      : Number(formData.total_bill_amount),
+};
 
-      const response = await fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams(payload).toString(),
+
+    // 3️⃣ Send to Node backend
+    const res = await fetch(`${API_BASE}/update/${selectedTask.task_no}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+      toast.success("Task updated successfully");
+
+      // Update Zustand
+      updateRepairTask(selectedTask.task_no, {
+        ...payload,
+        actual2: new Date().toISOString(),
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        // Update the Zustand store
-        updateRepairTask(selectedTask.taskNo, {
-          actual1: payload.Actual1,
-          transporterName: formData.transporterName,
-          transportationAmount: formData.transportationAmount,
-          billImage: billImageUrl,
-          billNo: formData.billNo,
-          typeOfBill: formData.typeOfBill,
-          totalBillAmount: formData.totalBillAmount,
-          toBePaidAmount: formData.toBePaidAmount
-        });
-        
-        toast.success("✅ Task updated successfully");
-        setIsModalOpen(false);
-        fetchAllTasks(); // refresh the table
-      } else {
-        toast.error("❌ Failed to update task: " + result.message);
-      }
-    } catch (error) {
-      console.error("Submit error:", error);
-      toast.error("❌ Something went wrong while submitting");
-    } finally {
-      setLoaderSubmit(false);
+      setIsModalOpen(false);
+      fetchAllTasks(); // refresh list
+    } else {
+      toast.error("Failed to update task");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    toast.error("Error submitting form");
+  } finally {
+    setLoaderSubmit(false);
+  }
+};
+
+
+const computedToBePaid = React.useMemo(() => {
+  const total = Number(formData.total_bill_amount);
+  const advance = Number(selectedTask?.how_much);
+
+  if (!total) return "";
+  if (selectedTask?.payment_type === "Advance") {
+    return total - advance >= 0 ? total - advance : "";
+  }
+  return total;
+}, [formData.total_bill_amount, selectedTask]);
 
  
 
@@ -317,7 +281,7 @@ const CheckMachine = () => {
               </TableHeader>
               <TableBody>
                 {pendingRepairTasks.map((task) => (
-                  <TableRow key={task.taskNo}>
+                  <TableRow key={task.task_no}>
                     <TableCell>
                       <Button
                         size="sm"
@@ -329,19 +293,19 @@ const CheckMachine = () => {
                       </Button>
                     </TableCell>
                     <TableCell className="font-medium text-blue-600">
-                      {task.taskNo}
+                      {task.task_no}
                     </TableCell>
-                    <TableCell>{task.machineName}</TableCell>
+                    <TableCell>{task.machine_name}</TableCell>
 
-                    <TableCell>{task.planned1}</TableCell>
+                    <TableCell>{task.planned_1}</TableCell>
 
-                    <TableCell>{task.serialNo}</TableCell>
+                    <TableCell>{task.serial_no}</TableCell>
                     <TableCell>{task.doerName}</TableCell>
-                    <TableCell>{task.vendorName || "-"}</TableCell>
-                    <TableCell>{task.transportationCharges}</TableCell>
-                    <TableCell>{task.leadTimeToDeliverDays}</TableCell>
-                    <TableCell>{task.paymentType || "-"}</TableCell>
-                    <TableCell>{task.howMuch || "-"}</TableCell>
+                    <TableCell>{task.vendor_name || "-"}</TableCell>
+                    <TableCell>{task.transportation_charges}</TableCell>
+                    <TableCell>{task.lead_time_to_deliver_days}</TableCell>
+                    <TableCell>{task.payment_type || "-"}</TableCell>
+                    <TableCell>{task.how_much || "-"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -381,39 +345,39 @@ const CheckMachine = () => {
               </TableHeader>
               <TableBody>
                 {historyRepairTasks.map((task) => (
-                  <TableRow key={task.taskNo}>
+                  <TableRow key={task.task_no}>
                     <TableCell className="font-medium text-blue-600">
-                      {task.taskNo}
+                      {task.task_no}
                     </TableCell>
-                    <TableCell>{task.machineName}</TableCell>
-                    <TableCell>{task.serialNo}</TableCell>
-                    <TableCell>{task.planned1}</TableCell>
+                    <TableCell>{task.machine_name}</TableCell>
+                    <TableCell>{task.serial_no}</TableCell>
+                    <TableCell>{task.planned_1}</TableCell>
                     <TableCell>{task.doerName}</TableCell>
-                    <TableCell>{task.vendorName || "-"}</TableCell>
-                    <TableCell>{task.leadTimeToDeliverDays}</TableCell>
-                    <TableCell>{task.paymentType || "-"}</TableCell>
-                    <TableCell>{task.howMuch || "-"}</TableCell>
-                    <TableCell>{task.tranporterName || "-"}</TableCell>
+                    <TableCell>{task.vendor_name || "-"}</TableCell>
+                    <TableCell>{task.lead_time_to_deliver_days}</TableCell>
+                    <TableCell>{task.payment_type || "-"}</TableCell>
+                    <TableCell>{task.how_much || "-"}</TableCell>
+                    <TableCell>{task.transporter_name_2 || "-"}</TableCell>
                     <TableCell>
-                      ₹{task.toBePaidAmount?.toLocaleString() || "-"}
+                      ₹{task.to_be_paid_amount?.toLocaleString() || "-"}
                     </TableCell>
 
-                    <TableCell>{task.billNo || "-"}</TableCell>
-                    <TableCell>{task.typeOfBill || "-"}</TableCell>
+                    <TableCell>{task.bill_no || "-"}</TableCell>
+                    <TableCell>{task.type_of_bill || "-"}</TableCell>
 
                     <TableCell>
-                      ₹{task.totalBillAmount?.toLocaleString() || "-"}
+                      ₹{task.total_bill_amount?.toLocaleString() || "-"}
                     </TableCell>
 
                     <TableCell>
-                      {task.billImage ? (
+                      {task.bill_image ? (
                         <Button
                           size="sm"
                           variant="primary"
 
                           onClick={() =>
                             window.open(
-                              task.billImage,
+                              task.bill_image,
                               "_blank"
                             )
                           }
@@ -454,7 +418,7 @@ const CheckMachine = () => {
               </label>
               <input
                 type="text"
-                value={selectedTask?.taskNo || ""}
+                value={selectedTask?.task_no || ""}
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
               />
@@ -466,7 +430,7 @@ const CheckMachine = () => {
               </label>
               <input
                 type="text"
-                value={selectedTask?.machineName || ""}
+                value={selectedTask?.machine_name || ""}
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
               />
@@ -479,21 +443,21 @@ const CheckMachine = () => {
               </label>
               <input
                 type="text"
-                value={selectedTask?.paymentType || ""}
+                value={selectedTask?.payment_type || ""}
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
               />
             </div>
 
-            {/* ONLY show this field if paymentType is "Advance" */}
-            {selectedTask?.paymentType === "Advance" && (
+            {/* ONLY show this field if payment_type is "Advance" */}
+            {selectedTask?.payment_type === "Advance" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   How Much (Advance Amount)
                 </label>
                 <input
                   type="text"
-                  value={selectedTask?.howMuch || ""}
+                  value={selectedTask?.how_much || ""}
                   readOnly
                   className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
                 />
@@ -542,9 +506,9 @@ const CheckMachine = () => {
               </label>
               <input
                 type="text"
-                value={formData.billNo}
+                value={formData.bill_no}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, billNo: e.target.value }))
+                  setFormData((prev) => ({ ...prev, bill_no: e.target.value }))
                 }
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -556,11 +520,11 @@ const CheckMachine = () => {
                 Type of Bill *
               </label>
               <select
-                value={formData.typeOfBill}
+                value={formData.type_of_bill}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    typeOfBill: e.target.value,
+                    type_of_bill: e.target.value,
                   }))
                 }
                 required
@@ -580,11 +544,11 @@ const CheckMachine = () => {
               </label>
               <input
                 type="number"
-                value={formData.totalBillAmount}
+                value={formData.total_bill_amount}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    totalBillAmount: e.target.value,
+                    total_bill_amount: e.target.value,
                   }))
                 }
                 required
@@ -602,7 +566,7 @@ const CheckMachine = () => {
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    billImage: e.target.files[0],
+                    bill_image: e.target.files[0],
                   }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -614,11 +578,11 @@ const CheckMachine = () => {
                 Payment Type *
               </label>
               <select
-                value={formData.paymentType}
+                value={formData.payment_type}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    paymentType: e.target.value,
+                    payment_type: e.target.value,
                   }))
                 }
                 required
@@ -631,25 +595,21 @@ const CheckMachine = () => {
                 <option value="Credit Card">Credit Card</option>
               </select>
             </div> */}
-
-      {formData.totalBillAmount && (
+{selectedTask && (
   <div className="mt-4">
     <label className="block text-sm font-medium text-gray-700 mb-2">
       To Be Paid Amount
     </label>
+
     <input
       type="number"
-      value={
-        selectedTask?.howMuch != null &&
-        formData.totalBillAmount - selectedTask.howMuch >= 0
-          ? formData.totalBillAmount - selectedTask.howMuch
-          : ""
-      }
+      value={computedToBePaid}
       readOnly
-      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md focus:outline-none"
+      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md"
     />
   </div>
 )}
+
 
           </div>
 

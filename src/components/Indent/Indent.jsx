@@ -42,72 +42,26 @@ const Indent = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
-  const fetchAllTasks = async () => {
-    try {
-      setLoadingTasks(true);
-      const SHEET_NAME_TASK = "Repair System";
+const fetchAllTasks = async () => {
+  try {
+    setLoadingTasks(true);
 
-      const res = await fetch(
-        `${SCRIPT_URL}?sheetId=${SHEET_Id}&&sheet=${SHEET_NAME_TASK}`
-      );
-      const result = await res.json();
+    const res = await fetch("http://localhost:5050/api/repair/all");
+    const result = await res.json();
 
-      const allRows = result?.table?.rows || [];
-
-      // Skip first 5 rows (index 0 to 4)
-      const taskRows = allRows.slice(5);
-
-      const formattedTasks = taskRows.map((row, index) => {
-        const cells = row.c || [];
-
-        // Safe cell access with fallbacks
-        const getCellValue = (index) => {
-          return cells[index]?.v || "";
-        };
-
-        // Get status from column AU (index 46)
-        const statusValue = getCellValue(46);
-        let status;
-        if (statusValue.toLowerCase() === "complete") {
-          status = "Complete";
-        } else if (statusValue.toLowerCase() === "pending") {
-          status = "Pending";
-        } else {
-          status = "Pending"; // Default to Pending if blank or any other value
-        }
-
-        return {
-          id: `task-${index}`, // Add unique id for React keys
-          timestamp: getCellValue(0),
-          taskNo: getCellValue(1),
-          serialNo: getCellValue(2),
-          machineName: getCellValue(3),
-          machinePartName: getCellValue(4),
-          givenBy: getCellValue(5),
-          doerName: getCellValue(6),
-          problem: getCellValue(7),
-          enableReminder: getCellValue(8),
-          requireAttachment: getCellValue(9),
-          taskStartDate: getCellValue(10),
-          taskEndDate: getCellValue(11),
-          priority: getCellValue(12),
-          department: getCellValue(13),
-          location: getCellValue(14),
-          imageLink: getCellValue(15),
-          status: status,
-        };
-      });
-
-      console.log("Formatted Tasks:", formattedTasks);
-      setTasks(formattedTasks);
-    } catch (err) {
-      console.error("Error fetching tasks:", err);
-      // Set empty array on error to prevent rendering issues
+    if (result.success) {
+      setTasks(result.tasks);
+    } else {
       setTasks([]);
-    } finally {
-      setLoadingTasks(false);
     }
-  };
+  } catch (err) {
+    console.error("Error fetching tasks:", err);
+    setTasks([]);
+  } finally {
+    setLoadingTasks(false);
+  }
+};
+
 
   useEffect(() => {
     fetchAllTasks();

@@ -67,76 +67,29 @@ const SentMachine = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
-  const fetchAllTasks = async () => {
-    // console.log("selectedTaskType", selectedTaskType);
-    try {
-      setLoadingTasks(true);
-      const SHEET_NAME_TASK = "Repair System";
+const fetchAllTasks = async () => {
+  try {
+    setLoadingTasks(true);
 
-      const res = await fetch(
-        `${SCRIPT_URL}?sheetId=${SHEET_Id}&&sheet=${SHEET_NAME_TASK}`
-      );
-      const result = await res.json();
+    const res = await fetch("http://localhost:5050/api/repair-system/all");
+    const result = await res.json();
 
-      const allRows = result?.table?.rows || [];
+    if (result.success) {
+      setTasks(result.tasks);
 
-      // Skip first 5 rows (index 0 to 4)
-      const taskRows = allRows.slice(5);
+      // Pending → actual_1 is NULL
+      setPendingTasks(result.tasks.filter(t => !t.actual_1));
 
-      const formattedTasks = taskRows.map((row) => {
-        const cells = row.c;
-
-        return {
-          timestamp: cells[0]?.v || "",
-          taskNo: cells[1]?.v || "",
-          serialNo: cells[2]?.v || "",
-          machineName: cells[3]?.v || "",
-          machinePartName: cells[4]?.v || "",
-          givenBy: cells[5]?.v || "",
-          doerName: cells[6]?.v || "",
-          problem: cells[7]?.v || "",
-          enableReminder: cells[8]?.v || "",
-          requireAttachment: cells[9]?.v || "",
-          taskStartDate: cells[10]?.v || "",
-          taskEndDate: cells[11]?.v || "",
-          priority: cells[12]?.v || "",
-          department: cells[13]?.v || "",
-          location: cells[14]?.v || "",
-          imageUrl: cells[15]?.v || "",
-          planned: cells[16]?.v || "",
-          actual: cells[17]?.v || "",
-          delay: cells[18]?.v || "",
-
-          vendorName: cells[19]?.v || "",
-          leadTimeToDeliverDays: cells[20]?.v || "",
-          transporterName: cells[21]?.v || "",
-          transportationCharges: cells[22]?.v || "",
-          weighmentSlip: cells[23]?.v || "",
-          transportingImageWithMachine: cells[24]?.v || "",
-          paymentType: cells[25]?.v || "",
-          howMuch: cells[26]?.v || "",
-        };
-      });
-
-      // console.log("Formatted Tasks:", formattedTasks);
-      setTasks(formattedTasks);
-
-      // Set pending tasks
-
-      const pendingTasks = formattedTasks.filter((task) => task.actual === "");
-      setPendingTasks(pendingTasks);
-
-      // Set history tasks
-      const historyTasks = formattedTasks.filter(
-        (task) => task.actual !== "" && task.planned !== ""
-      );
-      setHistoryTasks(historyTasks);
-    } catch (err) {
-      console.error("Error fetching tasks:", err);
-    } finally {
-      setLoadingTasks(false);
+      // History → actual_1 has value
+      setHistoryTasks(result.tasks.filter(t => t.actual_1));
     }
-  };
+  } catch (err) {
+    console.error("Error fetching tasks:", err);
+  } finally {
+    setLoadingTasks(false);
+  }
+};
+
 
   useEffect(() => {
     fetchAllTasks();
@@ -194,62 +147,55 @@ const SentMachine = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log(
-      "form",
-      formData.paymentType === "Advance" ? formData.advancePayment : "6"
-    );
-    try {
-      let imageUrl = "";
-      setLoaderSubmit(true);
-      if (formData.transportingImage) {
-        imageUrl = await uploadFileToDrive(formData.transportingImage);
-      }
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-      const payload = {
-        action: "update1",
-        sheetName: "Repair System", // use your actual sheet name
-        taskNo: selectedTask.taskNo,
-        Actual: new Date().toLocaleString("en-GB", {
-          timeZone: "Asia/Kolkata",
-        }), // example: 29/07/2025, 12:44:00
-        "Vendor Name": formData.vendorName,
-        "(Transporter Name)": formData.transporterName,
-        "Transportation Charges": formData.transportationCharges,
-        "Weighment Slip": formData.weighmentSlip,
-        "Transporting Image With Machine": imageUrl,
-        "Lead Time To Deliver ( In No. Of Days)": formData.leadTimeToDeliver,
-        "Payment Type": formData.paymentType, // Add this
-        "How Much":
-          formData.paymentType === "Advance" ? formData.advancePayment : "", // Add this
-      };
+  try {
+    setLoaderSubmit(true);
 
-      const response = await fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams(payload).toString(),
-      });
+    let imageUrl = "";
 
-      const result = await response.json();
-      console.log("Update result:", result);
-
-      if (result.success) {
-        alert("✅ Task updated successfully");
-        setIsModalOpen(false);
-        fetchAllTasks(); // refresh the table
-      } else {
-        alert("❌ Failed to update task: " + result.message);
-      }
-    } catch (error) {
-      console.error("Submit error:", error);
-      alert("❌ Something went wrong while submitting");
-    } finally {
-      setLoaderSubmit(false);
+    if (formData.transportingImage) {
+      imageUrl = await uploadFileToDrive(formData.transportingImage);
     }
-  };
+
+    const payload = {
+      vendorName: formData.vendorName,
+      transporterName: formData.transporterName,
+      transportationCharges: formData.transportationCharges,
+      weighmentSlip: formData.weighmentSlip,
+      transportingImageWithMachine: imageUrl,
+      leadTimeToDeliver: formData.leadTimeToDeliver,
+      paymentType: formData.paymentType,
+      howMuch: formData.paymentType === "Advance" ? formData.advancePayment : "",
+    };
+
+    const res = await fetch(
+      `http://localhost:5050/api/repair-system/update/${selectedTask.task_no}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const result = await res.json();
+
+    if (result.success) {
+      alert("Task Updated Successfully");
+      setIsModalOpen(false);
+      fetchAllTasks();
+    } else {
+      alert("Update failed");
+    }
+  } catch (error) {
+    console.error("Submit error:", error);
+    alert("❌ Something went wrong while submitting");
+  } finally {
+    setLoaderSubmit(false);
+  }
+};
+
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -334,7 +280,7 @@ const SentMachine = () => {
                 </TableHeader>
                 <TableBody className="overflow-auto max-h-[calc(100vh-200px)] block">
                   {pendingTasks.map((task) => (
-                    <TableRow key={task.taskNo}>
+                    <TableRow key={task.task_no}>
                       <TableCell>
                         <Button
                           size="sm"
@@ -346,16 +292,16 @@ const SentMachine = () => {
                         </Button>
                       </TableCell>
                       <TableCell className="font-medium text-blue-600">
-                        {task.taskNo}
+                        {task.task_no}
                       </TableCell>
                       <TableCell>
-                        {new Date(task.taskStartDate).toLocaleDateString()}
+                        {new Date(task.task_start_date).toLocaleDateString()}
                       </TableCell>
-                      <TableCell>{task.machineName}</TableCell>
-                      <TableCell>{task.serialNo}</TableCell>
-                      <TableCell>{task.doerName}</TableCell>
+                      <TableCell>{task.machine_name}</TableCell>
+                      <TableCell>{task.serial_no}</TableCell>
+                      <TableCell>{task.doer_name}</TableCell>
                       <TableCell>{task.department}</TableCell>
-                      <TableCell>{task.machinePartName}</TableCell>
+                      <TableCell>{task.machine_part_name}</TableCell>
                       <TableCell>
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(
@@ -408,53 +354,48 @@ const SentMachine = () => {
               </TableHeader>
               <TableBody>
                 {historyTasks.map((task) => (
-                  <TableRow key={task.taskNo}>
-                    <TableCell className="font-medium text-blue-600">
-                      {task.taskNo}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(task.taskStartDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{task.serialNo}</TableCell>
-                    <TableCell>{task.machineName}</TableCell>
-                    <TableCell>{task.doerName}</TableCell>
-                    {/* to do */}
+                <TableRow key={task.task_no}>
+  <TableCell className="font-medium text-blue-600">
+    {task.task_no}
+  </TableCell>
 
-                    <TableCell>{task.department}</TableCell>
-                    <TableCell>{task.vendorName}</TableCell>
-                    <TableCell>{task.leadTimeToDeliverDays}</TableCell>
-                    <TableCell>{task.transporterName}</TableCell>
-                    <TableCell>{task.transportationCharges}</TableCell>
-                    <TableCell>{task.weighmentSlip}</TableCell>
-                    <TableCell>
-                      {task.transportingImageWithMachine ? (
-                        <Button
-                          size="sm"
-                          variant="primary"
+  <TableCell>
+    {task.task_start_date
+      ? new Date(task.task_start_date).toLocaleDateString()
+      : "-"}
+  </TableCell>
 
-                          onClick={() =>
-                            window.open(
-                              task.transportingImageWithMachine,
-                              "_blank"
-                            )
-                          }
-                        >
-                          View
-                        </Button>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell>{task.paymentType}</TableCell>
-                    <TableCell>{task.howMuch}</TableCell>
+  <TableCell>{task.serial_no}</TableCell>
+  <TableCell>{task.machine_name}</TableCell>
+  <TableCell>{task.doer_name}</TableCell>
 
-                    <TableCell>{task.machinePartName}</TableCell>
-                    <TableCell>{task.vendorName || "-"}</TableCell>
-                    <TableCell>{task.transporterName || "-"}</TableCell>
-                    <TableCell>
-                      ₹{task.transportationCharges?.toLocaleString() || "-"}
-                    </TableCell>
-                  </TableRow>
+  <TableCell>{task.machine_part_name}</TableCell>
+  <TableCell>{task.vendor_name}</TableCell>
+  <TableCell>{task.lead_time_to_deliver}</TableCell>
+  <TableCell>{task.transporter_name_1}</TableCell>
+  <TableCell>{task.transportation_charges}</TableCell>
+  <TableCell>{task.weighment_slip}</TableCell>
+
+  <TableCell>
+    {task.transporting_image_with_machine ? (
+      <Button
+        size="sm"
+        variant="primary"
+        onClick={() =>
+          window.open(task.transporting_image_with_machine, "_blank")
+        }
+      >
+        View
+      </Button>
+    ) : (
+      "-"
+    )}
+  </TableCell>
+
+  <TableCell>{task.payment_type}</TableCell>
+  <TableCell>{task.how_much}</TableCell>
+</TableRow>
+
                 ))}
               </TableBody>
             </Table>
@@ -483,7 +424,7 @@ const SentMachine = () => {
               </label>
               <input
                 type="text"
-                value={selectedTask?.taskNo || ""}
+                value={selectedTask?.task_no || ""}
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
               />
@@ -495,7 +436,7 @@ const SentMachine = () => {
               </label>
               <input
                 type="text"
-                value={selectedTask?.machineName || ""}
+                value={selectedTask?.machine_name || ""}
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
               />

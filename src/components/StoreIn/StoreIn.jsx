@@ -73,101 +73,44 @@ const StoreIn = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
-  const fetchAllTasks = async () => {
-    try {
-      setLoadingTasks(true);
-      const SHEET_NAME_TASK = "Repair System";
+  const API_URL = "http://localhost:5050/api/store-in";
 
-      const res = await fetch(
-        `${SCRIPT_URL}?sheetId=${SHEET_Id}&&sheet=${SHEET_NAME_TASK}`
-      );
-      const result = await res.json();
 
-      const allRows = result?.table?.rows || [];
-      const taskRows = allRows.slice(5);
+const fetchAllTasks = async () => {
+  try {
+    setLoadingTasks(true);
 
-      const formattedTasks = taskRows.map((row, index) => {
-        const cells = row.c || [];
+    // const res = await fetch(`${API_URL}/repair-system/stage3`);
+    const res = await fetch(`${API_URL}/all`);
+    const data = await res.json();
 
-        // Safe cell value extraction
-        const getCellValue = (index) => {
-          return cells[index]?.v || "";
-        };
-
-        return {
-          id: `store-task-${index}`, // Add unique id
-          timestamp: getCellValue(0),
-          taskNo: getCellValue(1),
-          serialNo: getCellValue(2),
-          machineName: getCellValue(3),
-          machinePartName: getCellValue(4),
-          givenBy: getCellValue(5),
-          doerName: getCellValue(6),
-          problem: getCellValue(7),
-          enableReminder: getCellValue(8),
-          requireAttachment: getCellValue(9),
-          taskStartDate: getCellValue(10),
-          taskEndDate: getCellValue(11),
-          priority: getCellValue(12),
-          department: getCellValue(13),
-          location: getCellValue(14),
-          imageUrl: getCellValue(15),
-          planned: getCellValue(16),
-          actual: getCellValue(17),
-          delay: getCellValue(18),
-          vendorName: getCellValue(19),
-          leadTimeToDeliverDays: getCellValue(20),
-          transporterName: getCellValue(21),
-          transportationCharges: getCellValue(22),
-          weighmentSlip: getCellValue(23),
-          transportingImageWithMachine: getCellValue(24),
-          paymentType: getCellValue(25),
-          howMuch: getCellValue(26),
-          planned1: getCellValue(27),
-          actual1: getCellValue(28),
-          tranporterName: getCellValue(30),
-          billImage: getCellValue(32),
-          billNo: getCellValue(33),
-          typeOfBill: getCellValue(34),
-          totalBillAmount: getCellValue(35),
-          toBePaidAmount: getCellValue(36),
-          planned2: getCellValue(37),
-          actual2: getCellValue(38),
-          delay2: getCellValue(39),
-          receivedQuantity: getCellValue(40),
-          billMatch: getCellValue(41),
-          productImage: getCellValue(42),
-        };
-      });
-
-      console.log("Formatted Store Tasks:", formattedTasks);
-      setRepairTasks(formattedTasks);
-      
-      // Filter pending tasks (has planned2 but no actual2)
-      const pendingTasks = formattedTasks.filter(
-        (task) => task.planned2 && !task.actual2
-      );
-      console.log("Pending Tasks:", pendingTasks);
-      setPendingRepairTasks(pendingTasks);
-
-      // Filter history tasks (has both planned2 and actual2)
-      const historyTasks = formattedTasks.filter(
-        (task) => task.planned2 && task.actual2
-      );
-      console.log("History Tasks:", historyTasks);
-      setHistoryRepairTasks(historyTasks);
-      
-    } catch (err) {
-      console.error("Error fetching tasks:", err);
+    if (!data.success) {
       toast.error("Failed to fetch tasks");
-      // Set empty arrays on error to prevent undefined states
-      setRepairTasks([]);
-      setPendingRepairTasks([]);
-      setHistoryRepairTasks([]);
-    } finally {
-      setLoadingTasks(false);
+      return;
     }
-  };
+
+    const formattedTasks = data.tasks;
+
+    setRepairTasks(formattedTasks);
+
+    // Pending → planned_3 exists AND actual_3 is null
+    const pendingTasks = formattedTasks.filter(
+      (task) => task.planned_3 && !task.actual_3
+    );
+    setPendingRepairTasks(pendingTasks);
+
+    // History → both exist
+    const historyTasks = formattedTasks.filter(
+      (task) => task.planned_3 && task.actual_3
+    );
+    setHistoryRepairTasks(historyTasks);
+
+  } catch (err) {
+    toast.error("Error fetching tasks");
+  } finally {
+    setLoadingTasks(false);
+  }
+};
 
   useEffect(() => {
     fetchAllTasks();
@@ -218,64 +161,53 @@ const StoreIn = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    try {
-      setSubmitLoading(true);
-      let billImageUrl = "";
-      if (formData.productImage) {
-        billImageUrl = await uploadFileToDrive(formData.productImage);
-      }
+  try {
+    setSubmitLoading(true);
 
-      const payload = {
-        action: "update1",
-        sheetName: "Repair System",
-        taskNo: selectedTask.taskNo,
-        Actual2: new Date().toLocaleString("en-GB", { timeZone: "Asia/Kolkata" }),
-        "Received Quantity": formData.receivedQuantity,
-        "Bill Match": formData.billMatch ? "Yes" : "No",
-        "Bill Image": billImageUrl,
-        "Bill No.": formData.billNo,
-        "Product Image": billImageUrl,
-      };
+    let uploadedImageUrl = "";
 
-      const response = await fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams(payload).toString(),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Update the Zustand store
-        updateRepairTask(selectedTask.taskNo, {
-          actual2: payload.Actual2,
-          receivedQuantity: formData.receivedQuantity,
-          billMatch: formData.billMatch ? "Yes" : "No",
-          billImage: billImageUrl,
-          billNo: formData.billNo,
-          productImage: billImageUrl
-        });
-        
-        // Refresh data after successful update
-        await fetchAllTasks();
-        
-        toast.success("✅ Task updated successfully");
-        setIsModalOpen(false);
-      } else {
-        toast.error("❌ Failed to update task: " + result.message);
-      }
-    } catch (error) {
-      console.error("Submit error:", error);
-      toast.error("❌ Something went wrong while submitting");
-    } finally {
-      setSubmitLoading(false);
+    if (formData.productImage) {
+      uploadedImageUrl = await uploadFileToDrive(formData.productImage);
     }
-  };
+
+    const body = {
+      actual_3: new Date().toISOString(),   // ⭐ FIX: Send actual_3
+      receivedQuantity: formData.receivedQuantity,
+      billMatch: formData.billMatch ? "Yes" : "No",
+      billImage: uploadedImageUrl,
+      billNo: formData.billNo,
+      productImage: uploadedImageUrl,
+    };
+
+    const res = await fetch(`${API_URL}/update/${selectedTask.taskNo}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const result = await res.json();
+
+    if (!result.success) {
+      toast.error("Failed to update task");
+      return;
+    }
+
+    toast.success("Task updated successfully");
+    setIsModalOpen(false);
+    await fetchAllTasks();
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Error submitting form");
+  } finally {
+    setSubmitLoading(false);
+  }
+};
+
+
 
   const formatCurrency = (amount) => {
     if (!amount || isNaN(Number(amount))) return "-";
@@ -388,7 +320,7 @@ const StoreIn = () => {
                       </TableCell>
                       <TableCell>{task.machineName || "-"}</TableCell>
                       <TableCell>{task.serialNo || "-"}</TableCell>
-                      <TableCell>{task.planned2 || "-"}</TableCell>
+                      <TableCell>{task.planned_3 || "-"}</TableCell>
                       <TableCell>{task.doerName || "-"}</TableCell>
                       <TableCell>{task.vendorName || "-"}</TableCell>
                       <TableCell>{task.leadTimeToDeliverDays || "-"}</TableCell>
