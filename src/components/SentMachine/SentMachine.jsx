@@ -67,11 +67,14 @@ const SentMachine = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
+
 const fetchAllTasks = async () => {
   try {
     setLoadingTasks(true);
 
-    const res = await fetch("http://localhost:5050/api/repair-system/all");
+    // const res = await fetch("http://localhost:5050/api/repair-system/all");
+    const res = await fetch(`${API_URL}/repair-system/all`);
     const result = await res.json();
 
     if (result.success) {
@@ -95,57 +98,57 @@ const fetchAllTasks = async () => {
     fetchAllTasks();
   }, []);
 
-  const uploadFileToDrive = async (file) => {
-    const reader = new FileReader();
+  // const uploadFileToDrive = async (file) => {
+  //   const reader = new FileReader();
 
-    return new Promise((resolve, reject) => {
-      reader.onload = async () => {
-        const base64Data = reader.result;
+  //   return new Promise((resolve, reject) => {
+  //     reader.onload = async () => {
+  //       const base64Data = reader.result;
 
-        // console.log("base64Data", base64Data);
-        // console.log("file.name", file.name);
-        // console.log("file.type", file.type);
-        // console.log("FOLDER_ID", FOLDER_ID);
+  //       // console.log("base64Data", base64Data);
+  //       // console.log("file.name", file.name);
+  //       // console.log("file.type", file.type);
+  //       // console.log("FOLDER_ID", FOLDER_ID);
 
-        try {
-          const res = await fetch(SCRIPT_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              action: "uploadFile",
-              base64Data: base64Data,
-              fileName: file.name,
-              mimeType: file.type,
-              folderId: FOLDER_ID,
-            }).toString(),
-          });
+  //       try {
+  //         const res = await fetch(SCRIPT_URL, {
+  //           method: "POST",
+  //           headers: {
+  //             "Content-Type": "application/x-www-form-urlencoded",
+  //           },
+  //           body: new URLSearchParams({
+  //             action: "uploadFile",
+  //             base64Data: base64Data,
+  //             fileName: file.name,
+  //             mimeType: file.type,
+  //             folderId: FOLDER_ID,
+  //           }).toString(),
+  //         });
 
-          const data = await res.json();
+  //         const data = await res.json();
 
-          console.log("FileUploadData", data);
+  //         console.log("FileUploadData", data);
 
-          if (data.success && data.fileUrl) {
-            resolve(data.fileUrl);
-          } else {
-            toast.error("❌ File upload failed");
-            resolve("");
-          }
-        } catch (err) {
-          console.error("Upload error:", err);
-          toast.error("❌ Upload failed due to network error");
-          resolve("");
-        }
-      };
+  //         if (data.success && data.fileUrl) {
+  //           resolve(data.fileUrl);
+  //         } else {
+  //           toast.error("❌ File upload failed");
+  //           resolve("");
+  //         }
+  //       } catch (err) {
+  //         console.error("Upload error:", err);
+  //         toast.error("❌ Upload failed due to network error");
+  //         resolve("");
+  //       }
+  //     };
 
-      reader.onerror = () => {
-        reject("❌ Failed to read file");
-      };
+  //     reader.onerror = () => {
+  //       reject("❌ Failed to read file");
+  //     };
 
-      reader.readAsDataURL(file);
-    });
-  };
+  //     reader.readAsDataURL(file);
+  //   });
+  // };
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -153,31 +156,37 @@ const handleSubmit = async (e) => {
   try {
     setLoaderSubmit(true);
 
-    let imageUrl = "";
+    // ⭐ Create FormData for file + fields
+    const formDataToSend = new FormData();
 
-    if (formData.transportingImage) {
-      imageUrl = await uploadFileToDrive(formData.transportingImage);
+    formDataToSend.append("vendorName", formData.vendorName);
+    formDataToSend.append("transporterName", formData.transporterName);
+    formDataToSend.append("transportationCharges", formData.transportationCharges);
+    formDataToSend.append("weighmentSlip", formData.weighmentSlip);
+    formDataToSend.append("leadTimeToDeliver", formData.leadTimeToDeliver);
+    formDataToSend.append("paymentType", formData.paymentType);
+
+    // Conditionally append advance amount
+    if (formData.paymentType === "Advance") {
+      formDataToSend.append("howMuch", formData.advancePayment);
+    } else {
+      formDataToSend.append("howMuch", "");
     }
 
-    const payload = {
-      vendorName: formData.vendorName,
-      transporterName: formData.transporterName,
-      transportationCharges: formData.transportationCharges,
-      weighmentSlip: formData.weighmentSlip,
-      transportingImageWithMachine: imageUrl,
-      leadTimeToDeliver: formData.leadTimeToDeliver,
-      paymentType: formData.paymentType,
-      howMuch: formData.paymentType === "Advance" ? formData.advancePayment : "",
-    };
+    // ⭐ File append → must match multer.single("transportingImage")
+    if (formData.transportingImage) {
+      formDataToSend.append("transportingImage", formData.transportingImage);
+    }
 
-    const res = await fetch(
-      `http://localhost:5050/api/repair-system/update/${selectedTask.task_no}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
+    // ⭐ SEND FORM-DATA (no content-type)
+   const res = await fetch(
+  `${API_URL}/repair-system/update/${selectedTask.task_no}`,
+  {
+    method: "PUT",
+    body: formDataToSend,
+  }
+);
+
 
     const result = await res.json();
 
@@ -188,6 +197,7 @@ const handleSubmit = async (e) => {
     } else {
       alert("Update failed");
     }
+
   } catch (error) {
     console.error("Submit error:", error);
     alert("❌ Something went wrong while submitting");
@@ -195,6 +205,7 @@ const handleSubmit = async (e) => {
     setLoaderSubmit(false);
   }
 };
+
 
 
   const getPriorityColor = (priority) => {

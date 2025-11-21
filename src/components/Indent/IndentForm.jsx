@@ -37,6 +37,8 @@ const IndentForm = ({ onSubmit, onCancel, taskList }) => {
   const [loaderSubmit, setLoaderSubmit] = useState(false);
   const [loaderMasterSheetData, setLoaderMasterSheetData] = useState(false);
 
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
+
   // --------------------------------------------
   // 🔵 FETCH OPTIONS FROM POSTGRESQL BACKEND
   // --------------------------------------------
@@ -44,7 +46,8 @@ const IndentForm = ({ onSubmit, onCancel, taskList }) => {
     try {
       setLoaderMasterSheetData(true);
 
-      const res = await fetch("http://localhost:5050/api/repair-options/form-options");
+      const res = await fetch(`${API_URL}/repair-options/form-options`)
+
       const result = await res.json();
 
       if (result.success) {
@@ -144,67 +147,54 @@ const handleSubmitForm = async (e) => {
   // ----------------------------
   const buildTimestamp = (date, time) => {
     if (!date || !time) return null;
-    return `${date} ${time}:00`; // → YYYY-MM-DD HH:MM:SS (VALID FOR POSTGRES)
+    return `${date} ${time}:00`;
   };
 
   // ----------------------------
-  // 3️⃣ SAFE CURRENT TIMESTAMP FOR time_stamp COLUMN (ISO FORMAT)
+  // 3️⃣ CURRENT TIMESTAMP
   // ----------------------------
   const now = new Date();
   const timeStamp = now.toISOString().replace("T", " ").substring(0, 19);
-  // Output: "2025-11-20 17:50:10"
 
-  // ----------------------------
-  // 4️⃣ UPLOAD FILE IF EXISTS
-  // ----------------------------
-  let userManualUrl = "";
-  try {
-    if (userManualFile) {
-      userManualUrl = await uploadFileToDrive(userManualFile);
-    }
-  } catch (err) {
-    console.error("❌ File upload error:", err);
-    toast.error("File upload failed");
+  // ---------------------------------------------------------
+  // 4️⃣ BUILD FORM-DATA (IMPORTANT FOR FILE UPLOAD)
+  // ---------------------------------------------------------
+  const formData = new FormData();
+
+  formData.append("time_stamp", timeStamp);
+  formData.append("serial_no", selectedSerialNo);
+  formData.append("machine_name", selectedMachine);
+  formData.append("given_by", selectedGivenBy);
+  formData.append("doer_name", selectedDoerName);
+
+  formData.append("enable_reminders", enableReminder);
+  formData.append("require_attachment", requireAttachment);
+
+  formData.append("task_start_date", buildTimestamp(startDate, startTime));
+  formData.append("task_ending_date", buildTimestamp(endTaskDate, endTime));
+
+  formData.append("problem_with_machine", description || "");
+  formData.append("department", selectedDepartment || "");
+  formData.append("location", location || "");
+  formData.append("machine_part_name", machinePartName || "");
+  formData.append("priority", selectedPriority || "");
+
+  // ⭐ FILE → append only if exists
+  if (userManualFile) {
+    formData.append("image", userManualFile); // MUST MATCH multer.single("image")
   }
 
-  // ----------------------------
-  // 5️⃣ BUILD CLEAN PAYLOAD
-  // ----------------------------
-  const payload = {
-    time_stamp: timeStamp,
+  console.log("📤 FormData sending to backend...");
 
-    serial_no: selectedSerialNo,
-    machine_name: selectedMachine,
-    given_by: selectedGivenBy,
-    doer_name: selectedDoerName,
-
-    enable_reminders: !!enableReminder,
-    require_attachment: !!requireAttachment,
-
-    task_start_date: buildTimestamp(startDate, startTime),
-    task_ending_date: buildTimestamp(endTaskDate, endTime),
-
-    problem_with_machine: description || "",
-    department: selectedDepartment || "",
-    location: location || "",
-    machine_part_name: machinePartName || "",
-
-    image_link: userManualUrl || "link not available",
-    priority: selectedPriority || "",
-  };
-
-  console.log("📨 Final Payload Sent to Backend:", payload);
-
-  // ----------------------------
-  // 6️⃣ SEND TO BACKEND
-  // ----------------------------
+  // ---------------------------------------------------------
+  // 5️⃣ SEND REQUEST (NO HEADERS FOR FORM-DATA)
+  // ---------------------------------------------------------
   try {
     setLoaderSubmit(true);
 
-    const response = await fetch("http://localhost:5050/api/repair/create", {
+    const response = await fetch(`${API_URL}/repair/create`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: formData, // ⭐ IMPORTANT
     });
 
     const result = await response.json();
@@ -212,22 +202,20 @@ const handleSubmitForm = async (e) => {
 
     if (result.success) {
       toast.success("✅ Repair Task Created Successfully!");
-
-      // Reset form
       clearFormState();
-
       if (onSubmit) onSubmit();
       onCancel();
     } else {
-      toast.error("Server Error! Please check backend logs.");
+      toast.error(result.message || "Server Error!");
     }
   } catch (error) {
     console.error("❌ Backend error:", error);
-    toast.error("Unable to submit! Check console.");
+    toast.error("Unable to submit!");
   } finally {
     setLoaderSubmit(false);
   }
 };
+
 
 
   // --------------------------------------------

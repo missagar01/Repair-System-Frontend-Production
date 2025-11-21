@@ -57,7 +57,9 @@ const CheckMachine = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
-  const API_BASE = "http://localhost:5050/api/repair-check";
+  // const API_BASE = "http://localhost:5050/api/repair-check";
+  const API_BASE = import.meta.env.VITE_API_BASE_URL + "/repair-check";
+
 
 
 const fetchAllTasks = async () => {
@@ -95,50 +97,22 @@ const fetchAllTasks = async () => {
     fetchAllTasks();
   }, []);
 
- const uploadFileToDrive = async (file) => {
-    const reader = new FileReader();
+const uploadBillToS3 = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
 
-    return new Promise((resolve, reject) => {
-      reader.onload = async () => {
-        const base64Data = reader.result;
+  const res = await fetch(`${API_BASE}/upload-bill`, {
+    method: "POST",
+    body: formData,
+  });
 
-        try {
-          const res = await fetch(SCRIPT_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              action: "uploadFile",
-              base64Data: base64Data,
-              fileName: file.name,
-              mimeType: file.type,
-              folderId: FOLDER_ID,
-            }).toString(),
-          });
+  const data = await res.json();
+  if (data.success) return data.url;
 
-          const data = await res.json();
+  toast.error("S3 Upload Failed");
+  return "";
+};
 
-          if (data.success && data.fileUrl) {
-            resolve(data.fileUrl);
-          } else {
-            toast.error("❌ File upload failed");
-            resolve("");
-          }
-        } catch (err) {
-          console.error("Upload error:", err);
-          toast.error("❌ Upload failed due to network error");
-          resolve("");
-        }
-      };
-
-      reader.onerror = () => {
-        reject("❌ Failed to read file");
-      };
-
-      reader.readAsDataURL(file);
-    });
-  };
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -146,10 +120,11 @@ const handleSubmit = async (e) => {
     setLoaderSubmit(true);
 
     // 1️⃣ Upload bill image to drive (same function you already have)
-    let bill_imageUrl = "";
-    if (formData.bill_image) {
-      bill_imageUrl = await uploadFileToDrive(formData.bill_image);
-    }
+   let bill_imageUrl = "";
+if (formData.bill_image) {
+  bill_imageUrl = await uploadBillToS3(formData.bill_image);
+}
+
 
     // 2️⃣ Prepare payload
     const payload = {

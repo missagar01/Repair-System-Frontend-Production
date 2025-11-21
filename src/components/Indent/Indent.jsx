@@ -42,11 +42,16 @@ const Indent = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
+
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
+
+
 const fetchAllTasks = async () => {
   try {
     setLoadingTasks(true);
 
-    const res = await fetch("http://localhost:5050/api/repair/all");
+    // const res = await fetch("http://localhost:5050/api/repair/all");
+    const res = await fetch(`${API_URL}/repair/all`);
     const result = await res.json();
 
     if (result.success) {

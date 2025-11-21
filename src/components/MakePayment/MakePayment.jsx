@@ -63,7 +63,7 @@ const MakePayment = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
-  const API = "http://localhost:5050/api/payment";  // Update if deployed
+  const API = `${import.meta.env.VITE_API_BASE_URL}/payment`;  // Update if deployed
 
 const fetchAllTasks = async () => {
   try {
@@ -125,7 +125,7 @@ const newPayment = {
 
 
 
-    const res = await fetch("http://localhost:5050/api/payment/add", {
+    const res = await fetch(`${API_URL}/payment/add`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newPayment)

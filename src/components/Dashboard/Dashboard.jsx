@@ -53,11 +53,14 @@ const Dashboard = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1IUX8rnhuodWWPQ2PPAFurz-S1Xoz-9h5";
 
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
+
 const fetchAllTasks = async () => {
   try {
     setLoading(true);
 
-    const res = await fetch("http://localhost:5050/api/dashboard");
+    // const res = await fetch("http://localhost:5050/api/dashboard");
+    const res = await fetch(`${API_URL}/dashboard`);
     const result = await res.json();
 
     if (!result.success) {

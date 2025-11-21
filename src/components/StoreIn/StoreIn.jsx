@@ -73,7 +73,9 @@ const StoreIn = () => {
   const SHEET_Id = "1-j3ydNhMDwa-SfvejOH15ow7ZZ10I1zwdV4acAirHe4";
   const FOLDER_ID = "1ZOuHUXUjONnHb4TBWqztjQcI5Pjvy_n0";
 
-  const API_URL = "http://localhost:5050/api/store-in";
+  // const API_URL = `${import.meta.env.VITE_API_BASE_URL}/store-in`;
+  const API_URL = `${import.meta.env.VITE_API_BASE_URL}/store-in`;
+
 
 
 const fetchAllTasks = async () => {
@@ -116,50 +118,21 @@ const fetchAllTasks = async () => {
     fetchAllTasks();
   }, []);
 
-  const uploadFileToDrive = async (file) => {
-    const reader = new FileReader();
+const uploadProductToS3 = async (file) => {
+  const fd = new FormData();
+  fd.append("file", file);
 
-    return new Promise((resolve, reject) => {
-      reader.onload = async () => {
-        const base64Data = reader.result;
+  const res = await fetch(`${API_URL}/upload-product`, {
+    method: "POST",
+    body: fd,
+  });
 
-        try {
-          const res = await fetch(SCRIPT_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              action: "uploadFile",
-              base64Data: base64Data,
-              fileName: file.name,
-              mimeType: file.type,
-              folderId: FOLDER_ID,
-            }).toString(),
-          });
+  const data = await res.json();
+  if (data.success) return data.url;
 
-          const data = await res.json();
-
-          if (data.success && data.fileUrl) {
-            resolve(data.fileUrl);
-          } else {
-            toast.error("❌ File upload failed");
-            resolve("");
-          }
-        } catch (err) {
-          console.error("Upload error:", err);
-          toast.error("❌ Upload failed due to network error");
-          resolve("");
-        }
-      };
-
-      reader.onerror = () => {
-        reject("❌ Failed to read file");
-      };
-
-      reader.readAsDataURL(file);
-    });
-  };
+  toast.error("Image upload failed");
+  return "";
+};
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -170,8 +143,9 @@ const handleSubmit = async (e) => {
     let uploadedImageUrl = "";
 
     if (formData.productImage) {
-      uploadedImageUrl = await uploadFileToDrive(formData.productImage);
-    }
+  uploadedImageUrl = await uploadProductToS3(formData.productImage);
+}
+
 
     const body = {
       actual_3: new Date().toISOString(),   // ⭐ FIX: Send actual_3
